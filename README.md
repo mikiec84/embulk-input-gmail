@@ -1,27 +1,36 @@
 # Gmail input plugin for Embulk
 
-TODO: Write short description here and build.gradle file.
+ Gmail API の検索結果を取得します。
 
 ## Overview
 
 * **Plugin type**: input
-* **Resume supported**: yes
-* **Cleanup supported**: yes
+* **Resume supported**: no
+* **Cleanup supported**: no
 * **Guess supported**: no
 
 ## Configuration
 
-- **option1**: description (integer, required)
-- **option2**: description (string, default: `"myvalue"`)
-- **option3**: description (string, default: `null`)
+- **client_secret**: client secret json file of Google APIs. (string, required)
+- **tokens_directory**: tokens directory of Gmail API Client Library for Java. (string, required)
+- **user**: search user. (string, default: `me`)
+- **query**: search query. (string, default: ``(empty string))
+- **after_than**: Gmail search query "after_than: xxx".
+                  Concat this config string, after "query" config string.
+                  You use if '-o' option. (string, default: null)
 
 ## Example
 
 ```yaml
 in:
   type: gmail
-  option1: example1
-  option2: example2
+  client_secret: ./client_secret_xxx.json
+  tokens_directory: ./tokens
+  query: "\"Google アラート\""
+  after_than: 1d
+  columns:
+    - {name: Subject, type: string}
+    - {name: Body, type: string}
 ```
 
 

@@ -17,30 +17,45 @@ import org.embulk.spi.PageOutput;
 import org.embulk.spi.Schema;
 import org.embulk.spi.SchemaConfig;
 
+import org.slf4j.Logger;
+
 public class GmailInputPlugin
         implements InputPlugin
 {
     public interface PluginTask
             extends Task
     {
-        // configuration option 1 (required integer)
-        @Config("option1")
-        public int getOption1();
+        // Gmail client secret json path. (required string)
+        @Config("client_secret")
+        public String getClientSecretPath();
 
-        // configuration option 2 (optional string, null is not allowed)
-        @Config("option2")
-        @ConfigDefault("\"myvalue\"")
-        public String getOption2();
+        // Gmail API tokens directory. (required string)
+        @Config("tokens_directory")
+        public String getTokensDirectory();
 
-        // configuration option 3 (optional string, null is allowed)
-        @Config("option3")
+        // Gmail search user. (optional, default: "me")
+        @Config("user")
+        @ConfigDefault("\"me\"")
+        public String getUser();
+
+        // Gmail search query. (optional, default: "")
+        @Config("query")
+        @ConfigDefault("\"\"")
+        public String getQuery();
+
+        // Gmail search query "after_than: xxx". (optional, default: null)
+        // Concat this config string, after "query" config string.
+        // You use if '-o' option.
+        @Config("after_than")
         @ConfigDefault("null")
-        public Optional<String> getOption3();
+        public Optional<String> getAfterThan();
 
-        // if you get schema from config
+        // schema
         @Config("columns")
         public SchemaConfig getColumns();
     }
+
+    private Logger log = Exec.getLogger(GmailInputPlugin.class);
 
     @Override
     public ConfigDiff transaction(ConfigSource config,
@@ -77,7 +92,17 @@ public class GmailInputPlugin
     {
         PluginTask task = taskSource.loadTask(PluginTask.class);
 
-        // Write your code here :)
+        log.info("Try login use '{}' and '{}'.", task.getClientSecretPath(), task.getTokensDirectory());
+
+        // query 文字列組み立て
+        String query = task.getQuery();
+        Optional<String> afterThan = task.getAfterThan();
+        for (String p : afterThan.asSet()) {
+            query += " after_than:" + p;
+        }
+
+        log.info("Send query : '{}'", query);
+
         throw new UnsupportedOperationException("GmailInputPlugin.run method is not implemented yet");
     }
 

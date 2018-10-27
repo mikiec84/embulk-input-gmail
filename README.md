@@ -21,18 +21,36 @@
 
 ## Example
 
+### basic
+
 ```yaml
 in:
   type: gmail
   client_secret: ./client_secret_xxx.json
   tokens_directory: ./tokens
   query: "\"Google アラート\""
-  after_than: 1d
   columns:
     - {name: Subject, type: string}
     - {name: Body, type: string}
 ```
 
+Sending query is `"Google アラート"`.
+
+### Use `-o` option.
+
+```yaml
+in:
+  type: gmail
+  client_secret: ./client_secret_xxx.json
+  tokens_directory: ./tokens
+  query: "\"Google アラート\""
+  after_than: 2018/10/1 # automatically update to last query sending time.
+  columns:
+    - {name: Subject, type: string}
+    - {name: Body, type: string}
+```
+
+Sending query is `"Google アラート" after_than:2018/10/1`.
 
 ## Build
 

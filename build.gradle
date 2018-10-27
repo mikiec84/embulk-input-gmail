@@ -14,13 +14,14 @@ configurations {
 }
 
 version = "0.1.0"
+[compileJava, compileTestJava]*.options*.encoding = "UTF-8"
 
 sourceCompatibility = 1.8
 targetCompatibility = 1.8
 
 dependencies {
-    compile  "org.embulk:embulk-core:0.9.9-SNAPSHOT"
-    provided "org.embulk:embulk-core:0.9.9-SNAPSHOT"
+    compile  "org.embulk:embulk-core:0.9.8"
+    provided "org.embulk:embulk-core:0.9.8"
     // compile "YOUR_JAR_DEPENDENCY_GROUP:YOUR_JAR_DEPENDENCY_MODULE:YOUR_JAR_DEPENDENCY_VERSION"
     testCompile "junit:junit:4.+"
 }

@@ -1,21 +1,32 @@
 package org.embulk.input.gmail;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.google.common.base.Optional;
 
 import org.embulk.config.Config;
 import org.embulk.config.ConfigDefault;
 import org.embulk.config.ConfigDiff;
+import org.embulk.config.ConfigInject;
 import org.embulk.config.ConfigSource;
 import org.embulk.config.Task;
 import org.embulk.config.TaskReport;
 import org.embulk.config.TaskSource;
+import org.embulk.spi.BufferAllocator;
+import org.embulk.spi.Column;
+import org.embulk.spi.ColumnVisitor;
 import org.embulk.spi.Exec;
 import org.embulk.spi.InputPlugin;
+import org.embulk.spi.PageBuilder;
 import org.embulk.spi.PageOutput;
 import org.embulk.spi.Schema;
 import org.embulk.spi.SchemaConfig;
+import org.embulk.spi.time.Timestamp;
+import org.embulk.spi.time.TimestampParseException;
+import org.embulk.spi.time.TimestampParser;
+import org.embulk.spi.util.Timestamps;
 
 import org.slf4j.Logger;
 
@@ -23,7 +34,7 @@ public class GmailInputPlugin
         implements InputPlugin
 {
     public interface PluginTask
-            extends Task
+            extends Task, TimestampParser.Task
     {
         // Gmail client secret json path. (required string)
         @Config("client_secret")
@@ -53,6 +64,10 @@ public class GmailInputPlugin
         // schema
         @Config("columns")
         public SchemaConfig getColumns();
+
+        // 謎。バッファアロケーターの実装を定義？
+        @ConfigInject
+        public BufferAllocator getBufferAllocator();
     }
 
     private Logger log = Exec.getLogger(GmailInputPlugin.class);
@@ -103,12 +118,118 @@ public class GmailInputPlugin
 
         log.info("Send query : '{}'", query);
 
-        throw new UnsupportedOperationException("GmailInputPlugin.run method is not implemented yet");
+        // Visitor 作成
+        BufferAllocator allocator = task.getBufferAllocator();
+        PageBuilder pageBuilder = new PageBuilder(allocator, schema, output);
+        Map<String, String> row = new HashMap<>();
+        row.put("Subject", "test subject.");
+        row.put("Body", "test body.");
+        // for
+            // Visitor 作成
+            ColumnVisitor visitor = new ColumnVisitorImpl(row, task, pageBuilder);
+            // スキーマ解析
+            schema.visitColumns(visitor);
+            // 編集したレコードを追加
+            pageBuilder.addRecord();
+        // }
+        pageBuilder.finish();
+
+        TaskReport taskReport = Exec.newTaskReport();
+        return taskReport;
     }
 
     @Override
     public ConfigDiff guess(ConfigSource config)
     {
         return Exec.newConfigDiff();
+    }
+
+    class ColumnVisitorImpl implements ColumnVisitor {
+        private final Map<String, String> row;
+        private final TimestampParser[] timestampParsers;
+        private final PageBuilder pageBuilder;
+
+        ColumnVisitorImpl(Map<String, String> row, PluginTask task, PageBuilder pageBuilder) {
+            this.row = row;
+            this.pageBuilder = pageBuilder;
+
+            this.timestampParsers = Timestamps.newTimestampColumnParsers(
+                    task, task.getColumns());
+        }
+
+        @Override
+        public void booleanColumn(Column column) {
+            String value = row.get(column.getName());
+            if (value == null) {
+                pageBuilder.setNull(column);
+            } else {
+                pageBuilder.setBoolean(column, Boolean.parseBoolean(value));
+            }
+        }
+
+        @Override
+        public void longColumn(Column column) {
+            String value = row.get(column.getName());
+            if (value == null) {
+                pageBuilder.setNull(column);
+            } else {
+                try {
+                    pageBuilder.setLong(column, Long.parseLong(value));
+                } catch (NumberFormatException e) {
+                    log.error("NumberFormatError: Row: {}", row);
+                    log.error("{}", e);
+                    pageBuilder.setNull(column);
+                }
+            }
+        }
+
+        @Override
+        public void doubleColumn(Column column) {
+            String value = row.get(column.getName());
+            if (value == null) {
+                pageBuilder.setNull(column);
+            } else {
+                try {
+                    pageBuilder.setDouble(column, Double.parseDouble(value));
+                } catch (NumberFormatException e) {
+                    log.error("NumberFormatError: Row: {}", row);
+                    log.error("{}", e);
+                    pageBuilder.setNull(column);
+                }
+            }
+        }
+
+        @Override
+        public void stringColumn(Column column) {
+            String value = row.get(column.getName());
+            if (value == null) {
+                pageBuilder.setNull(column);
+            } else {
+                pageBuilder.setString(column, value);
+            }
+        }
+
+        @Override
+        public void jsonColumn(Column column) {
+            throw new UnsupportedOperationException("This plugin doesn't support json type. Please try to upgrade version of the plugin using 'embulk gem update' command. If the latest version still doesn't support json type, please contact plugin developers, or change configuration of input plugin not to use json type.");
+        }
+
+        @Override
+        public void timestampColumn(Column column) {
+            String value = row.get(column.getName());
+            if (value == null) {
+                pageBuilder.setNull(column);
+            } else {
+                try {
+                    Timestamp timestamp = timestampParsers[column.getIndex()]
+                            .parse(value);
+                    pageBuilder.setTimestamp(column, timestamp);
+                } catch (TimestampParseException e) {
+                    log.error("TimestampParseError: Row: {}", row);
+                    log.error("{}", e);
+                    pageBuilder.setNull(column);
+                }
+            }
+        }
     }
 }

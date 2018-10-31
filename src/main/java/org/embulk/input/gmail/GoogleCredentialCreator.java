@@ -47,4 +47,10 @@ public class GoogleCredentialCreator {
             return new AuthorizationCodeInstalledApp(flow, receier).authorize("user");
         }
     }
+
+    public static void main(String[] args) throws IOException, GeneralSecurityException {
+        GoogleCredentialCreator.getCredentials(
+                Paths.get(args[0]),
+                args[1]);
+    }
 }

@@ -5,15 +5,16 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.security.GeneralSecurityException;
 import java.util.Collections;
 import java.util.List;
 
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.extensions.java6.auth.oauth2.AuthorizationCodeInstalledApp;
-import com.google.api.client.extensions.jetty.auth.oauth2.LocalServerReceiver;
 import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow;
 import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets;
+import com.google.api.client.googleapis.extensions.java6.auth.oauth2.GooglePromptReceiver;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.JsonFactory;
@@ -42,7 +43,7 @@ public class GoogleCredentialCreator {
                     .setDataStoreFactory(new FileDataStoreFactory(new File(tokenDirectory)))
                     .setAccessType("offline")
                     .build();
-            LocalServerReceiver receier = new LocalServerReceiver.Builder().setPort(8888).build();
+            GooglePromptReceiver receier = new GooglePromptReceiver();
             return new AuthorizationCodeInstalledApp(flow, receier).authorize("user");
         }
     }

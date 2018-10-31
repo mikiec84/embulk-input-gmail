@@ -28,7 +28,7 @@ import com.google.api.services.gmail.GmailScopes;
 public class GoogleCredentialCreator {
 
     private static final JsonFactory JSON_FACTORY = JacksonFactory.getDefaultInstance();
-    private static final List<String> SCOPES = Collections.singletonList(GmailScopes.GMAIL_LABELS);
+    private static final List<String> SCOPES = Collections.singletonList(GmailScopes.GMAIL_READONLY);
 
     private GoogleCredentialCreator() {}
 

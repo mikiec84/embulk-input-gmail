@@ -1,11 +1,8 @@
 package org.embulk.input.gmail;
 
 import java.io.IOException;
-import java.nio.file.Paths;
 import java.security.GeneralSecurityException;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import com.google.common.base.Optional;
 
@@ -57,12 +54,12 @@ public class GmailInputPlugin
         @ConfigDefault("\"\"")
         public String getQuery();
 
-        // Gmail search query "after_than: xxx". (optional, default: null)
+        // Gmail search query "after: xxx". (optional, default: null)
         // Concat this config string, after "query" config string.
         // You use if '-o' option.
-        @Config("after_than")
+        @Config("after")
         @ConfigDefault("null")
-        public Optional<String> getAfterThan();
+        public Optional<String> getAfter();
 
         // schema
         @Config("columns")
@@ -112,11 +109,15 @@ public class GmailInputPlugin
 
         log.info("Try login use '{}' and '{}'.", task.getClientSecretPath(), task.getTokensDirectory());
 
+        // user 取得
+        String user = task.getUser();
+        log.info("Query user: '{}'", user);
+
         // query 文字列組み立て
         String query = task.getQuery();
-        Optional<String> afterThan = task.getAfterThan();
-        for (String p : afterThan.asSet()) {
-            query += " after_than:" + p;
+        Optional<String> after = task.getAfter();
+        for (String p : after.asSet()) {
+            query += " after:" + p;
         }
 
         log.info("Send query : '{}'", query);
@@ -124,14 +125,13 @@ public class GmailInputPlugin
         // Visitor 作成
         BufferAllocator allocator = task.getBufferAllocator();
         PageBuilder pageBuilder = new PageBuilder(allocator, schema, output);
-        Map<String, String> row = new HashMap<>();
-        row.put("Subject", "test subject.");
-        row.put("Body", "test body.");
 
+        GmailWrapper.Result result;
         try {
-        GmailWrapper gmail = new GmailWrapper(
-                task.getClientSecretPath(),
-                task.getTokensDirectory());
+            GmailWrapper gmail = new GmailWrapper(
+                    task.getClientSecretPath(),
+                    task.getTokensDirectory());
+            result = gmail.search(user, query);
         } catch (IOException|GeneralSecurityException e) {
             log.error("{}", e.getClass(), e);
 
@@ -139,15 +139,19 @@ public class GmailInputPlugin
             return taskReport;
         }
 
-        // for
+
+        // success messages.
+        for (GmailWrapper.Message message : result.getSuccessMessages()) {
             // Visitor 作成
-            ColumnVisitor visitor = new ColumnVisitorImpl(row, task, pageBuilder);
+            ColumnVisitor visitor = new ColumnVisitorImpl(message, task, pageBuilder);
             // スキーマ解析
             schema.visitColumns(visitor);
             // 編集したレコードを追加
             pageBuilder.addRecord();
-        // }
+        }
         pageBuilder.finish();
+
+        // TODO: output failed message info to log.
 
         TaskReport taskReport = Exec.newTaskReport();
         return taskReport;
@@ -160,12 +164,12 @@ public class GmailInputPlugin
     }
 
     class ColumnVisitorImpl implements ColumnVisitor {
-        private final Map<String, String> row;
+        private final GmailWrapper.Message message;
         private final TimestampParser[] timestampParsers;
         private final PageBuilder pageBuilder;
 
-        ColumnVisitorImpl(Map<String, String> row, PluginTask task, PageBuilder pageBuilder) {
-            this.row = row;
+        ColumnVisitorImpl(GmailWrapper.Message message, PluginTask task, PageBuilder pageBuilder) {
+            this.message = message;
             this.pageBuilder = pageBuilder;
 
             this.timestampParsers = Timestamps.newTimestampColumnParsers(
@@ -174,7 +178,7 @@ public class GmailInputPlugin
 
         @Override
         public void booleanColumn(Column column) {
-            String value = row.get(column.getName());
+            String value = message.getHeaders().get(column.getName());
             if (value == null) {
                 pageBuilder.setNull(column);
             } else {
@@ -184,14 +188,14 @@ public class GmailInputPlugin
 
         @Override
         public void longColumn(Column column) {
-            String value = row.get(column.getName());
+            String value = message.getHeaders().get(column.getName());
             if (value == null) {
                 pageBuilder.setNull(column);
             } else {
                 try {
                     pageBuilder.setLong(column, Long.parseLong(value));
                 } catch (NumberFormatException e) {
-                    log.error("NumberFormatError: Row: {}", row);
+                    log.error("NumberFormatError: Header: `{}:{}`", column.getName(), value);
                     log.error("{}", e);
                     pageBuilder.setNull(column);
                 }
@@ -200,14 +204,14 @@ public class GmailInputPlugin
 
         @Override
         public void doubleColumn(Column column) {
-            String value = row.get(column.getName());
+            String value = message.getHeaders().get(column.getName());
             if (value == null) {
                 pageBuilder.setNull(column);
             } else {
                 try {
                     pageBuilder.setDouble(column, Double.parseDouble(value));
                 } catch (NumberFormatException e) {
-                    log.error("NumberFormatError: Row: {}", row);
+                    log.error("NumberFormatError: Header: `{}:{}`", column.getName(), value);
                     log.error("{}", e);
                     pageBuilder.setNull(column);
                 }
@@ -216,11 +220,20 @@ public class GmailInputPlugin
 
         @Override
         public void stringColumn(Column column) {
-            String value = row.get(column.getName());
-            if (value == null) {
-                pageBuilder.setNull(column);
+            if (column.getName().equals("Body")) {
+                String value = message.getBody().orElse(null);
+                if (value == null) {
+                    pageBuilder.setNull(column);
+                } else {
+                    pageBuilder.setString(column, value);
+                }
             } else {
-                pageBuilder.setString(column, value);
+                String value = message.getHeaders().get(column.getName());
+                if (value == null) {
+                    pageBuilder.setNull(column);
+                } else {
+                    pageBuilder.setString(column, value);
+                }
             }
         }
 
@@ -231,7 +244,7 @@ public class GmailInputPlugin
 
         @Override
         public void timestampColumn(Column column) {
-            String value = row.get(column.getName());
+            String value = message.getHeaders().get(column.getName());
             if (value == null) {
                 pageBuilder.setNull(column);
             } else {
@@ -240,7 +253,7 @@ public class GmailInputPlugin
                             .parse(value);
                     pageBuilder.setTimestamp(column, timestamp);
                 } catch (TimestampParseException e) {
-                    log.error("TimestampParseError: Row: {}", row);
+                    log.error("TimestampParseError: Header: `{}:{}`", column.getName(), value);
                     log.error("{}", e);
                     pageBuilder.setNull(column);
                 }

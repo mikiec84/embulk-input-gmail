@@ -1,5 +1,8 @@
 package org.embulk.input.gmail;
 
+import java.io.IOException;
+import java.nio.file.Paths;
+import java.security.GeneralSecurityException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -124,6 +127,18 @@ public class GmailInputPlugin
         Map<String, String> row = new HashMap<>();
         row.put("Subject", "test subject.");
         row.put("Body", "test body.");
+
+        try {
+        GmailWrapper gmail = new GmailWrapper(
+                task.getClientSecretPath(),
+                task.getTokensDirectory());
+        } catch (IOException|GeneralSecurityException e) {
+            log.error("{}", e.getClass(), e);
+
+            TaskReport taskReport = Exec.newTaskReport();
+            return taskReport;
+        }
+
         // for
             // Visitor 作成
             ColumnVisitor visitor = new ColumnVisitorImpl(row, task, pageBuilder);

@@ -100,9 +100,11 @@ public class GmailWrapper {
         return result;
     }
 
-    class Result {
+    public static class Result {
         private List<GmailWrapper.Message> success;
         private List<GmailWrapper.Message> failed;
+
+        public Result() {}
 
         public Result(
                 List<GmailWrapper.Message> success,
@@ -115,14 +117,24 @@ public class GmailWrapper {
             return success;
         }
 
+        public void setSuccessMessages(List<GmailWrapper.Message> successMessages) {
+            this.success = successMessages;
+        }
+
         public List<GmailWrapper.Message> getFailedMessages() {
             return failed;
         }
+
+        public void setFailedMessages(List<GmailWrapper.Message> failedMessages) {
+            this.failed = failedMessages;
+        }
     }
 
-    class Message {
+    public static class Message {
         private Map<String, String> headers;
         private Optional<String> body;
+
+        public Message() {}
 
         public Message(
                 Map<String, String> headers,
@@ -135,8 +147,16 @@ public class GmailWrapper {
             return headers;
         }
 
+        public void setHeaders(Map<String, String> headers) {
+            this.headers = headers;
+        }
+
         public Optional<String> getBody() {
             return body;
+        }
+
+        public void setBody(String body) {
+            this.body = Optional.ofNullable(body);
         }
     }
 }

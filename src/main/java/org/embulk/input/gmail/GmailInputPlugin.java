@@ -68,6 +68,10 @@ public class GmailInputPlugin
         // 謎。バッファアロケーターの実装を定義？
         @ConfigInject
         public BufferAllocator getBufferAllocator();
+
+        // 検索結果
+        public GmailWrapper.Result getResult();
+        public void setResult(GmailWrapper.Result result);
     }
 
     private Logger log = Exec.getLogger(GmailInputPlugin.class);
@@ -78,8 +82,40 @@ public class GmailInputPlugin
     {
         PluginTask task = config.loadConfig(PluginTask.class);
 
+        log.info("Try login use '{}' and '{}'.",
+                task.getClientSecretPath(),
+                task.getTokensDirectory());
+
+        // user 取得
+        String user = task.getUser();
+        log.info("Query user: '{}'", user);
+
+        // query 文字列組み立て
+        String query = task.getQuery();
+        Optional<String> after = task.getAfter();
+        for (String p : after.asSet()) {
+            query += " after:" + p;
+        }
+
+        log.info("Send query : '{}'", query);
+
+        GmailWrapper.Result result;
+        try {
+            GmailWrapper gmail = new GmailWrapper(
+                    task.getClientSecretPath(),
+                    task.getTokensDirectory());
+            result = gmail.search(user, query);
+            task.setResult(result);
+        } catch (IOException|GeneralSecurityException e) {
+            log.error("{}", e.getClass(), e);
+
+            return Exec.newConfigDiff();
+        }
+
         Schema schema = task.getColumns().toSchema();
-        int taskCount = 1;  // number of run() method calls
+        int taskCount = result.getSuccessMessages().size();  // number of run() method calls
+
+        log.info("taskCount: {}", taskCount);
 
         return resume(task.dump(), schema, taskCount, control);
     }
@@ -107,48 +143,22 @@ public class GmailInputPlugin
     {
         PluginTask task = taskSource.loadTask(PluginTask.class);
 
-        log.info("Try login use '{}' and '{}'.", task.getClientSecretPath(), task.getTokensDirectory());
-
-        // user 取得
-        String user = task.getUser();
-        log.info("Query user: '{}'", user);
-
-        // query 文字列組み立て
-        String query = task.getQuery();
-        Optional<String> after = task.getAfter();
-        for (String p : after.asSet()) {
-            query += " after:" + p;
-        }
-
-        log.info("Send query : '{}'", query);
-
         // Visitor 作成
         BufferAllocator allocator = task.getBufferAllocator();
         PageBuilder pageBuilder = new PageBuilder(allocator, schema, output);
 
-        GmailWrapper.Result result;
-        try {
-            GmailWrapper gmail = new GmailWrapper(
-                    task.getClientSecretPath(),
-                    task.getTokensDirectory());
-            result = gmail.search(user, query);
-        } catch (IOException|GeneralSecurityException e) {
-            log.error("{}", e.getClass(), e);
-
-            TaskReport taskReport = Exec.newTaskReport();
-            return taskReport;
-        }
-
-
         // success messages.
-        for (GmailWrapper.Message message : result.getSuccessMessages()) {
-            // Visitor 作成
-            ColumnVisitor visitor = new ColumnVisitorImpl(message, task, pageBuilder);
-            // スキーマ解析
-            schema.visitColumns(visitor);
-            // 編集したレコードを追加
-            pageBuilder.addRecord();
-        }
+        GmailWrapper.Result result = task.getResult();
+        log.info("taskIndex: {}", taskIndex);
+        GmailWrapper.Message message = result.getSuccessMessages().get(taskIndex);
+
+        // Visitor 作成
+        ColumnVisitor visitor = new ColumnVisitorImpl(message, task, pageBuilder);
+        // スキーマ解析
+        schema.visitColumns(visitor);
+        // 編集したレコードを追加
+        pageBuilder.addRecord();
+
         pageBuilder.finish();
 
         // TODO: output failed message info to log.

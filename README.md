@@ -29,7 +29,7 @@ Set`client_secret.json` and `tokens` path, to `config.yaml`.(See [Configuration]
 - **query**: search query. (string, default: ``(empty string))
 - **after**: Gmail search query "after: xxx".
                   Concat this config string, after "query" config string.
-                  You use if '-o' option. (string, default: null)
+                  You use if '-c' option. (string, default: null)
 
 ## Example
 
@@ -51,7 +51,7 @@ in:
 
 Sending query is `"Google アラート"`.
 
-### Use `-o` option.
+### Use `-c` option.
 
 ```yaml
 in:
@@ -69,14 +69,13 @@ in:
     - {name: Body, type: string}
 ```
 
-Sending query is `"Google アラート" after:2018/10/31`.
-
-NOTE: `-o` IS NOT IMPLEMENTED NOW.
+Sending query is `"Google アラート" before:CURRENT_TIME after:2018/10/31`.
+Next time, `CURRENT_TIME` to set in  `after`.
 
 
 # TODO
 
-- [ ] : `-o` option
+- [x] : `-c` option
 - [ ] : Use option perser in GoogleCredentialCreator
 
 

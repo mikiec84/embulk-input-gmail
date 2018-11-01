@@ -90,7 +90,19 @@ public class GmailInputPlugin
             InputPlugin.Control control)
     {
         control.run(taskSource, schema, taskCount);
-        return Exec.newConfigDiff();
+
+        // ConfigDiff を作成し、after に now をセット
+        List<TaskReport> taskReportList =
+                control.run(taskSource, schema, taskCount);
+        ConfigDiff configDiff = Exec.newConfigDiff();
+        for (TaskReport taskReport : taskReportList) {
+            final String label = "after";
+            final String after = taskReport.get(String.class, label, null);
+            if (after != null) {
+                configDiff.set(label, after);
+            }
+        }
+        return configDiff;
     }
 
     @Override
@@ -115,8 +127,11 @@ public class GmailInputPlugin
 
         // query 文字列組み立て
         String query = task.getQuery();
+
+        String now = String.valueOf(System.currentTimeMillis() / 1000L);
         Optional<String> after = task.getAfter();
         for (String p : after.asSet()) {
+            query += " before:" + now;
             query += " after:" + p;
         }
 
@@ -154,6 +169,8 @@ public class GmailInputPlugin
         // TODO: output failed message info to log.
 
         TaskReport taskReport = Exec.newTaskReport();
+        taskReport.set("after", now);
+
         return taskReport;
     }
 

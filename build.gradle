@@ -87,7 +87,7 @@ Gem::Specification.new do |spec|
   spec.description   = %[Loads records from Gmail.]
   spec.email         = ["mikoto2000@gmail.com"]
   spec.licenses      = ["MIT"]
-  # TODO set this: spec.homepage      = "https://github.com/mikoto2000/embulk-input-gmail"
+  spec.homepage      = "https://github.com/mikoto2000/embulk-input-gmail"
 
   spec.files         = `git ls-files`.split("\n") + Dir["classpath/*.jar"]
   spec.test_files    = spec.files.grep(%r"^(test|spec)/")
